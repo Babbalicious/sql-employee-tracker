@@ -51,8 +51,8 @@ function promptUser() {
     .then((answers) => {
       switch (answers.action) {
         case "View All Employees":
+          // Function to view all employees
           console.log("Displaying all employees...");
-          viewAllEmployees();
 
           break;
         case "Add Employee":
@@ -96,32 +96,3 @@ function promptUser() {
 promptUser();
 
 pool.connect();
-
-
-const viewAllEmployees = () => {
-  const sql = `SELECT * FROM departments`;
-  
-  pool.query(sql, (err, res) => {
-    if(err) {
-      console.error('Error with query', err.stack);
-      promptUser();
-      return;
-    }
-    console.table(res.rows);
-    promptUser();
-  });
-};
-
-const viewDepartments = () => {
-  const sql = `SELECT * FROM departments`;
-  
-  pool.query(sql, (err, res) => {
-    if(err) {
-      console.error('Error with query', err.stack);
-      promptUser();
-      return;
-    }
-    console.table(res.rows);
-    promptUser();
-  });
-};
