@@ -26,3 +26,5 @@ CREATE TABLE employees (
     FOREIGN KEY (manager_id) REFERENCES employees(id) ON DELETE SET NULL
 );
 
+
+UPDATE employees SET role_id = 2 WHERE id = 3;

@@ -151,7 +151,7 @@ const addEmployee = async () => {
   ])
   .then((answers) => {
     const sql = `INSERT INTO employees (first_name, last_name, role_id, manager_id) VALUES ($1, $2, $3, $4)`;
-    console.log([answers.employeeFirstName, answers.employeeLastName, answers.employeeRole, answers.employeeManager]);
+    
     pool.query(sql, [answers.employeeFirstName, answers.employeeLastName, answers.employeeRole, answers.employeeManager], (err, res) => {
       if(err) {
         console.error('Error with query', err.stack);
@@ -167,8 +167,40 @@ const addEmployee = async () => {
   });
 }
 
-const updateEmployeeRole = () => {
-
+const updateEmployeeRole = async () => {
+  let employees = await getEmployees();
+  let roles = await getRoleTitles();
+  
+  inquirer.prompt([
+    {
+      type: 'list',
+      name: 'employee',
+      message: "Which employee's role do you want to update?",
+      choices: employees
+    },
+    {
+      type: 'list',
+      name: 'employeeRole',
+      message: "Which role do you want to assign the selected employee?",
+      choices: roles
+    }
+  ])
+  .then((answers) => {
+    const sql = `UPDATE employees SET role_id = $2 WHERE id = $1`;
+    
+    pool.query(sql, [answers.employee, answers.employeeRole], (err, res) => {
+      if(err) {
+        console.error('Error with query', err.stack);
+        promptUser();
+        return;
+      }
+      promptUser();
+    });
+  })
+  .catch((error) => {
+    console.error("Failed to update role", error);
+    promptUser();
+  });
 }
 
 const viewAllRoles = () => {
@@ -296,6 +328,20 @@ const getManagerTitles = async () => {
 const getDepartments = async () => {
   try {
     const result = await pool.query(`SELECT * FROM departments`);
+    const depts = result.rows.map(row => ({
+      name: row.name,
+      value: row.id
+    }));
+    return depts;
+  } catch (err) {
+    console.error('Error with query', err.stack);
+    throw err;
+  }
+};
+
+const getEmployees = async () => {
+  try {
+    const result = await pool.query(`SELECT id, first_name || ' ' || last_name AS name FROM employees`);
     const depts = result.rows.map(row => ({
       name: row.name,
       value: row.id
