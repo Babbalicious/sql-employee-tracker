@@ -53,30 +53,29 @@ function promptUser() {
         case "View All Employees":
           console.log("Displaying all employees...");
           viewAllEmployees();
-
           break;
         case "Add Employee":
-          // Function to add an employee
           console.log("Adding an employee...");
+          addEmployee();
           break;
         case "Update Employee Role":
-          // Function to update employee role
           console.log("Updating employee role...");
+          updateEmployeeRole();
           break;
         case "View All Roles":
-          // Function to view all roles
           console.log("Displaying all roles...");
+          viewAllRoles();
           break;
         case "Add Role":
-          // Function to add a role
           console.log("Adding a role...");
+          addRole();
           break;
         case "View All Departments":
           viewDepartments();
           break;
         case "Add Department":
-          // Function to add a department
           console.log("Adding a department...");
+          addDepartment();
           break;
         case "Quit":
           console.log("Exiting...");
@@ -99,7 +98,17 @@ pool.connect();
 
 
 const viewAllEmployees = () => {
-  const sql = `SELECT * FROM departments`;
+  const sql = `SELECT e.id,
+    e.first_name,
+    e.last_name,
+    roles.title AS title,
+    departments.name AS department,
+    roles.salary AS salary,
+    m.first_name || ' ' || m.last_name AS manager
+    FROM employees e
+    LEFT JOIN roles ON e.role_id = roles.id
+    LEFT JOIN departments ON roles.department = departments.id
+    LEFT JOIN employees m ON e.manager_id = m.id`;
   
   pool.query(sql, (err, res) => {
     if(err) {
@@ -111,6 +120,110 @@ const viewAllEmployees = () => {
     promptUser();
   });
 };
+
+const addEmployee = async () => {
+  let roles = await getRoleTitles();
+  let managers = await getManagerTitles();
+  
+  inquirer.prompt([
+    {
+      type: 'input',
+      name: 'employeeFirstName',
+      message: "What is employee's first name?"
+    },
+    {
+      type: 'input',
+      name: 'employeeLastName',
+      message: "What is employee's last name?"
+    },
+    {
+      type: 'list',
+      name: 'employeeRole',
+      message: "What is employee's role?",
+      choices: roles
+    },
+    {
+      type: 'list',
+      name: 'employeeManager',
+      message: "Who is employee's manager?",
+      choices: [...managers, { name: "None", value: null }]
+    }
+  ])
+  .then((answers) => {
+    const sql = `INSERT INTO employees (first_name, last_name, role_id, manager_id) VALUES ($1, $2, $3, $4)`;
+    console.log([answers.employeeFirstName, answers.employeeLastName, answers.employeeRole, answers.employeeManager]);
+    pool.query(sql, [answers.employeeFirstName, answers.employeeLastName, answers.employeeRole, answers.employeeManager], (err, res) => {
+      if(err) {
+        console.error('Error with query', err.stack);
+        promptUser();
+        return;
+      }
+      promptUser();
+    });
+  })
+  .catch((error) => {
+    console.error("Failed to add employee", error);
+    promptUser();
+  });
+}
+
+const updateEmployeeRole = () => {
+
+}
+
+const viewAllRoles = () => {
+  const sql = `SELECT roles.id, roles.title, departments.name AS department, roles.salary FROM roles 
+  JOIN departments ON roles.department = departments.id`;
+  
+  pool.query(sql, (err, res) => {
+    if(err) {
+      console.error('Error with query', err.stack);
+      promptUser();
+      return;
+    }
+    console.table(res.rows);
+    promptUser();
+  });
+}
+
+const addRole = async () => {
+  let departments = await getDepartments();
+  inquirer.prompt([
+    {
+      type: 'input',
+      name: 'roleName',
+      message: "What is the name of the role?"
+    },
+    {
+      type: 'input',
+      name: 'roleSalary',
+      message: "What is the salary of the role?"
+    },
+    {
+      type: 'list',
+      name: 'roleDepartment',
+      message: "Which department does the role belong to?",
+      choices: departments
+    }
+  ])
+  .then((answers) => {
+    const sql = `INSERT INTO roles (title, salary, department) VALUES ($1, $2, $3)`;
+    pool.query(sql, [answers.roleName, answers.roleSalary, answers.roleDepartment], (err, res) => {
+      if(err) {
+        console.error('Error with query', err.stack);
+        promptUser();
+        return;
+      }
+      console.log(`Added ${answers.roleName} to the database.`)
+      promptUser();
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to fetch departments:', error);
+    promptUser();
+  });
+}
+
 
 const viewDepartments = () => {
   const sql = `SELECT * FROM departments`;
@@ -124,4 +237,72 @@ const viewDepartments = () => {
     console.table(res.rows);
     promptUser();
   });
+};
+
+const addDepartment = () => {
+  inquirer.prompt([
+    {
+      type: 'input',
+      name: 'departmentName',
+      message: "What is the name of the department?"
+    }
+  ])
+  .then((answers) => {
+    const sql = `INSERT INTO departments (name) VALUES ($1)`;
+    pool.query(sql, [answers.departmentName], (err, res) => {
+      if(err) {
+        console.error('Error with query', err.stack);
+        promptUser();
+        return;
+      }
+      console.log(`Added ${answers.departmentName} to the database.`)
+      promptUser();
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to fetch roles or managers:', error);
+    promptUser();
+  });
+}
+
+const getRoleTitles = async () => {
+  try {
+    const result = await pool.query('SELECT id, title FROM roles');
+    const roles = result.rows.map(row => ({
+      name: row.title,
+      value: row.id
+    }));
+    return roles;
+  } catch (err) {
+    console.error('Error with query', err.stack);
+    throw err; 
+  }
+};
+
+const getManagerTitles = async () => {
+  try {
+    const result = await pool.query("SELECT id, first_name || ' ' || last_name AS manager_name FROM employees");
+    const managers = result.rows.map(row => ({
+      name: row.manager_name,
+      value: row.id
+    }));
+    return managers;
+  } catch (err) {
+    console.error('Error with query', err.stack);
+    throw err;
+  }
+};
+
+const getDepartments = async () => {
+  try {
+    const result = await pool.query(`SELECT * FROM departments`);
+    const depts = result.rows.map(row => ({
+      name: row.name,
+      value: row.id
+    }));
+    return depts;
+  } catch (err) {
+    console.error('Error with query', err.stack);
+    throw err;
+  }
 };
